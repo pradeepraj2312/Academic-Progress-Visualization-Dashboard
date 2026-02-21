@@ -1,0 +1,228 @@
+.auth-page {
+  min-height: calc(100vh - 70px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--page-bg, #f9fafb);
+  padding: 40px 20px;
+}
+
+.auth-container {
+  display: flex;
+  gap: 40px;
+  max-width: 1000px;
+  width: 100%;
+  align-items: center;
+}
+
+.auth-card {
+  flex: 1;
+  background: var(--card-bg, #fff);
+  border-radius: 12px;
+  padding: 40px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-color, #e0e0e0);
+}
+
+.auth-card.large-card {
+  padding: 50px;
+}
+
+.auth-title {
+  font-size: 32px;
+  color: var(--text-color, #333);
+  margin: 0 0 10px 0;
+  text-align: center;
+}
+
+.auth-subtitle {
+  text-align: center;
+  color: var(--text-secondary, #666);
+  margin: 0 0 30px 0;
+  font-size: 14px;
+}
+
+.error-message {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border-left: 4px solid #dc2626;
+  font-size: 14px;
+}
+
+[data-theme='dark'] .error-message {
+  background: #7f1d1d;
+  color: #fecaca;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-color, #333);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-color, #333);
+  background: var(--input-bg, #fff);
+  transition: all 0.3s ease;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--primary-color, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.form-group input:disabled {
+  background: var(--disabled-bg, #f3f4f6);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form-group select {
+  cursor: pointer;
+}
+
+.btn-submit {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--primary-color, #2563eb);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 10px;
+}
+
+.btn-submit:hover:not(:disabled) {
+  background: var(--primary-hover, #1d4ed8);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.btn-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.auth-footer {
+  text-align: center;
+  margin-top: 20px;
+  color: var(--text-secondary, #666);
+  font-size: 14px;
+}
+
+.auth-footer a {
+  color: var(--primary-color, #2563eb);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.3s ease;
+}
+
+.auth-footer a:hover {
+  color: var(--primary-hover, #1d4ed8);
+  text-decoration: underline;
+}
+
+.auth-illustration {
+  flex: 1;
+  background: linear-gradient(135deg, var(--gradient-1, #3b82f6) 0%, var(--gradient-2, #2563eb) 100%);
+  border-radius: 12px;
+  padding: 60px 40px;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+}
+
+.illustration-content {
+  text-align: center;
+}
+
+.illustration-content span {
+  font-size: 80px;
+  display: block;
+  margin-bottom: 20px;
+}
+
+.illustration-content h3 {
+  font-size: 24px;
+  margin: 0 0 10px 0;
+}
+
+.illustration-content p {
+  font-size: 16px;
+  opacity: 0.9;
+  margin: 0;
+  line-height: 1.6;
+}
+
+[data-theme='dark'] .auth-page {
+  --page-bg: #0f0f0f;
+  --card-bg: #1a1a1a;
+  --border-color: #333;
+  --text-color: #e0e0e0;
+  --text-secondary: #a0a0a0;
+  --input-bg: #262626;
+  --disabled-bg: #333;
+  --primary-color: #3b82f6;
+  --primary-hover: #1e40af;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .auth-container {
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .auth-card {
+    padding: 30px 20px;
+  }
+
+  .auth-card.large-card {
+    padding: 30px 20px;
+  }
+
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-illustration {
+    padding: 40px 20px;
+    min-height: 250px;
+  }
+
+  .illustration-content span {
+    font-size: 60px;
+  }
+
+  .illustration-content h3 {
+    font-size: 20px;
+  }
+}

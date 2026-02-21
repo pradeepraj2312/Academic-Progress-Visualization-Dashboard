@@ -1,0 +1,19 @@
+/* Import all styles */
+@import './styles/Navigation.css';
+@import './styles/HomePage.css';
+@import './styles/AuthPages.css';
+@import './styles/Dashboard.css';
+@import './styles/DashboardExtended.css';
+@import './styles/Global.css';
+
+#root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+main {
+  flex: 1;
+  background: var(--page-bg, #f9fafb);
+  transition: background 0.3s ease;
+}
