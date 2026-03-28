@@ -35,8 +35,15 @@ public class StudentAttendanceService {
         Student student = studentRepository.findByUserId(attendanceDTO.getUserId())
                 .orElseThrow(() -> new RuntimeException("Student not found with userId: " + attendanceDTO.getUserId()));
         
-        // Create or update attendance record
-        StudentAttendance attendance = new StudentAttendance();
+        // Create or update attendance record per user+date+session
+        Optional<StudentAttendance> existingAttendance = attendanceRepository
+            .findByUserIdAndAttendanceDateAndSession(
+                student.getUserId(),
+                attendanceDTO.getAttendanceDate(),
+                attendanceDTO.getSession()
+            );
+
+        StudentAttendance attendance = existingAttendance.orElseGet(StudentAttendance::new);
         attendance.setUserId(student.getUserId());
         attendance.setUsername(student.getUsername());
         attendance.setUserEmail(student.getUserEmail());
@@ -113,25 +120,39 @@ public class StudentAttendanceService {
      * Get attendance count for a student in a date range
      */
     public long getAttendanceCount(String userId, LocalDate startDate, LocalDate endDate) {
-        return attendanceRepository.countByUserIdAndAttendanceDateBetween(userId, startDate, endDate);
+        return attendanceRepository.findByUserIdAndAttendanceDateBetween(userId, startDate, endDate)
+                .stream()
+                .filter(a -> a.getStatus() == com.jd.apvd.entity.AttendanceStatus.PRESENT)
+                .count();
+    }
+
+    public double getPresentAttendanceUnits(String userId, LocalDate startDate, LocalDate endDate) {
+        return attendanceRepository.findByUserIdAndAttendanceDateBetween(userId, startDate, endDate)
+                .stream()
+                .filter(a -> a.getStatus() == com.jd.apvd.entity.AttendanceStatus.PRESENT)
+                .mapToDouble(a -> 0.5)
+                .sum();
+    }
+
+    public double getTotalAttendanceUnits(String userId, LocalDate startDate, LocalDate endDate) {
+        return attendanceRepository.findByUserIdAndAttendanceDateBetween(userId, startDate, endDate)
+                .stream()
+                .mapToDouble(a -> 0.5)
+                .sum();
     }
     
     /**
      * Get attendance percentage for a student in a date range
      */
     public double getAttendancePercentage(String userId, LocalDate startDate, LocalDate endDate) {
-        long presentCount = attendanceRepository.findByUserIdAndAttendanceDateBetween(userId, startDate, endDate)
-                .stream()
-                .filter(a -> a.getStatus().toString().equals("PRESENT"))
-                .count();
-        
-        long totalDays = java.time.temporal.ChronoUnit.DAYS.between(startDate, endDate) + 1;
-        
-        if (totalDays == 0) {
+        double presentUnits = getPresentAttendanceUnits(userId, startDate, endDate);
+        double totalUnits = getTotalAttendanceUnits(userId, startDate, endDate);
+
+        if (totalUnits == 0) {
             return 0;
         }
-        
-        return (presentCount * 100.0) / totalDays;
+
+        return (presentUnits * 100.0) / totalUnits;
     }
     
     /**

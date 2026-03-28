@@ -1,13 +1,21 @@
 package com.jd.apvd.service;
 
 import com.jd.apvd.dto.DepartmentDTO;
+import com.jd.apvd.dto.BulkUploadResultDTO;
 import com.jd.apvd.entity.Department;
+import com.jd.apvd.util.ExcelImportUtils;
 import com.jd.apvd.repository.DepartmentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -42,6 +50,45 @@ public class DepartmentService {
         log.info("Department added: {}", savedDepartment.getDepartmentName());
         
         return mapDepartmentToDTO(savedDepartment);
+    }
+
+    /**
+     * Bulk upload departments from Excel file.
+     * Expected columns: departmentName, departmentCode, description
+     */
+    @Transactional
+    public BulkUploadResultDTO bulkUploadDepartments(MultipartFile file) {
+        validateExcelFile(file);
+        BulkUploadResultDTO result = new BulkUploadResultDTO();
+
+        try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
+            Sheet sheet = workbook.getSheetAt(0);
+
+            for (int rowIndex = 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
+                Row row = sheet.getRow(rowIndex);
+                if (ExcelImportUtils.isRowEmpty(row)) {
+                    continue;
+                }
+
+                result.incrementTotalRows();
+
+                try {
+                    DepartmentDTO dto = new DepartmentDTO();
+                    dto.setDepartmentName(ExcelImportUtils.getCellString(row, 0));
+                    dto.setDepartmentCode(ExcelImportUtils.getCellString(row, 1));
+                    dto.setDescription(ExcelImportUtils.getCellString(row, 2));
+
+                    addDepartment(dto);
+                    result.incrementSuccessCount();
+                } catch (Exception ex) {
+                    result.addError("Row " + (rowIndex + 1) + ": " + ex.getMessage());
+                }
+            }
+
+            return result;
+        } catch (IOException ex) {
+            throw new RuntimeException("Failed to read uploaded Excel file", ex);
+        }
     }
     
     /**
@@ -116,5 +163,16 @@ public class DepartmentService {
         dto.setDepartmentCode(department.getDepartmentCode());
         dto.setDescription(department.getDescription());
         return dto;
+    }
+
+    private void validateExcelFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new RuntimeException("Please upload a non-empty Excel file");
+        }
+
+        String filename = file.getOriginalFilename();
+        if (filename == null || !(filename.endsWith(".xlsx") || filename.endsWith(".xls"))) {
+            throw new RuntimeException("Only .xlsx or .xls files are supported");
+        }
     }
 }

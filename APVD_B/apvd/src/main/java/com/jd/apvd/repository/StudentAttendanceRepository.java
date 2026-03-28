@@ -14,6 +14,7 @@ import java.util.Optional;
 @Repository
 public interface StudentAttendanceRepository extends JpaRepository<StudentAttendance, Long> {
     List<StudentAttendance> findByUserId(String userId);
+    long deleteByUserId(String userId);
     List<StudentAttendance> findByUserIdAndAttendanceDateBetween(String userId, LocalDate startDate, LocalDate endDate);
     List<StudentAttendance> findByUserIdOrderByAttendanceDateDesc(String userId);
     List<StudentAttendance> findByAttendanceDate(LocalDate date);

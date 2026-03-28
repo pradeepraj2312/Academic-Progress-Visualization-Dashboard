@@ -2,12 +2,15 @@ package com.jd.apvd.service;
 
 import com.jd.apvd.dto.UserRegisterDTO;
 import com.jd.apvd.dto.UserResponseDTO;
+import com.jd.apvd.dto.BulkUploadResultDTO;
 import com.jd.apvd.entity.Admin;
 import com.jd.apvd.entity.Faculty;
 import com.jd.apvd.entity.Student;
 import com.jd.apvd.entity.Users;
 import com.jd.apvd.entity.UserRole;
+import com.jd.apvd.util.ExcelImportUtils;
 import com.jd.apvd.repository.AdminRepository;
+import com.jd.apvd.repository.CourseRepository;
 import com.jd.apvd.repository.FacultyRepository;
 import com.jd.apvd.repository.StudentRepository;
 import com.jd.apvd.repository.UserRepository;
@@ -16,7 +19,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 
+import java.io.IOException;
 import java.util.Map;
 import java.util.List;
 import java.util.Set;
@@ -32,6 +41,7 @@ public class UserService {
     private final StudentRepository studentRepository;
     private final FacultyRepository facultyRepository;
     private final AdminRepository adminRepository;
+    private final CourseRepository courseRepository;
     private final PasswordEncoder passwordEncoder;
     
     /**
@@ -177,6 +187,94 @@ public class UserService {
         
         return mapUserToResponseDTO(savedUser);
     }
+
+    /**
+     * Bulk upload students from Excel file.
+     * Header row is expected at row 1 and data starts at row 2.
+     */
+    @Transactional
+    public BulkUploadResultDTO bulkUploadStudents(MultipartFile file) {
+        validateExcelFile(file);
+
+        BulkUploadResultDTO result = new BulkUploadResultDTO();
+
+        try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
+            Sheet sheet = workbook.getSheetAt(0);
+
+            for (int rowIndex = 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
+                Row row = sheet.getRow(rowIndex);
+                if (ExcelImportUtils.isRowEmpty(row)) {
+                    continue;
+                }
+
+                result.incrementTotalRows();
+
+                try {
+                    UserRegisterDTO dto = new UserRegisterDTO();
+                    dto.setUserId(ExcelImportUtils.getCellString(row, 0));
+                    dto.setUsername(ExcelImportUtils.getCellString(row, 1));
+                    dto.setUserEmail(ExcelImportUtils.getCellString(row, 2));
+                    dto.setUserPassword(ExcelImportUtils.getCellString(row, 3));
+                    dto.setMobile(ExcelImportUtils.getCellString(row, 4));
+                    dto.setEnrollmentNumber(ExcelImportUtils.getCellString(row, 5));
+                    dto.setDepartment(ExcelImportUtils.getCellString(row, 6));
+                    dto.setYearOfStudying(ExcelImportUtils.getCellInteger(row, 7));
+
+                    adminAddStudent(dto);
+                    result.incrementSuccessCount();
+                } catch (Exception ex) {
+                    result.addError("Row " + (rowIndex + 1) + ": " + ex.getMessage());
+                }
+            }
+
+            return result;
+        } catch (IOException ex) {
+            throw new RuntimeException("Failed to read uploaded Excel file", ex);
+        }
+    }
+
+    /**
+     * Bulk upload faculty from Excel file.
+     * Header row is expected at row 1 and data starts at row 2.
+     */
+    @Transactional
+    public BulkUploadResultDTO bulkUploadFaculties(MultipartFile file) {
+        validateExcelFile(file);
+
+        BulkUploadResultDTO result = new BulkUploadResultDTO();
+
+        try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
+            Sheet sheet = workbook.getSheetAt(0);
+
+            for (int rowIndex = 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
+                Row row = sheet.getRow(rowIndex);
+                if (ExcelImportUtils.isRowEmpty(row)) {
+                    continue;
+                }
+
+                result.incrementTotalRows();
+
+                try {
+                    UserRegisterDTO dto = new UserRegisterDTO();
+                    dto.setUserId(ExcelImportUtils.getCellString(row, 0));
+                    dto.setUsername(ExcelImportUtils.getCellString(row, 1));
+                    dto.setUserEmail(ExcelImportUtils.getCellString(row, 2));
+                    dto.setUserPassword(ExcelImportUtils.getCellString(row, 3));
+                    dto.setMobile(ExcelImportUtils.getCellString(row, 4));
+                    dto.setDepartment(ExcelImportUtils.getCellString(row, 5));
+
+                    adminAddFaculty(dto);
+                    result.incrementSuccessCount();
+                } catch (Exception ex) {
+                    result.addError("Row " + (rowIndex + 1) + ": " + ex.getMessage());
+                }
+            }
+
+            return result;
+        } catch (IOException ex) {
+            throw new RuntimeException("Failed to read uploaded Excel file", ex);
+        }
+    }
     
     /**
      * Get all users by role
@@ -317,6 +415,10 @@ public class UserService {
                 studentRepository.findByUserId(userId).ifPresent(studentRepository::delete);
                 break;
             case FACULTY:
+                long assignedCoursesCount = courseRepository.countByFacultyUserId(userId);
+                if (assignedCoursesCount > 0) {
+                    throw new RuntimeException("Faculty has " + assignedCoursesCount + " assigned course(s). Reassign courses before deleting this faculty.");
+                }
                 facultyRepository.findByUserId(userId).ifPresent(facultyRepository::delete);
                 break;
             case ADMIN:
@@ -326,6 +428,17 @@ public class UserService {
         
         // Delete user
         userRepository.delete(user);
+    }
+
+    private void validateExcelFile(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new RuntimeException("Please upload a non-empty Excel file");
+        }
+
+        String filename = file.getOriginalFilename();
+        if (filename == null || !(filename.endsWith(".xlsx") || filename.endsWith(".xls"))) {
+            throw new RuntimeException("Only .xlsx or .xls files are supported");
+        }
     }
     
     private UserResponseDTO mapUserToResponseDTO(Users user) {

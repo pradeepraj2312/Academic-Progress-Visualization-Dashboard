@@ -16,6 +16,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     List<Course> findByDepartmentAndSemester(String department, Integer semester);
     List<Course> findByDepartmentAndSemesterAndCourseStatus(String department, Integer semester, CourseStatus courseStatus);
     List<Course> findByFacultyUserId(String facultyUserId);
+    long countByFacultyUserId(String facultyUserId);
     List<Course> findByCourseStatus(CourseStatus courseStatus);
     List<Course> findByDepartmentAndCourseStatus(String department, CourseStatus courseStatus);
     boolean existsByCourseCode(String courseCode);

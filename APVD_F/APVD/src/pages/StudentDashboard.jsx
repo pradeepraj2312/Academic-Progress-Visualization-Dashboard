@@ -51,6 +51,84 @@ const StudentDashboard = () => {
     }
   }, [user, semester, activeTab]);
 
+  const calculateHalfDayAttendancePercentage = (attendanceRecords = []) => {
+    if (!Array.isArray(attendanceRecords) || attendanceRecords.length === 0) {
+      return 0;
+    }
+
+    const totals = attendanceRecords.reduce(
+      (acc, record) => {
+        const session = (record?.session || '').toUpperCase();
+        const weight = session === 'FN' || session === 'AN' ? 0.5 : 1;
+
+        acc.total += weight;
+        if ((record?.status || '').toUpperCase() === 'PRESENT') {
+          acc.present += weight;
+        }
+        return acc;
+      },
+      { present: 0, total: 0 }
+    );
+
+    if (totals.total === 0) {
+      return 0;
+    }
+
+    return Number(((totals.present / totals.total) * 100).toFixed(2));
+  };
+
+  const getAttendanceUnitSummary = (attendanceRecords = []) => {
+    if (!Array.isArray(attendanceRecords) || attendanceRecords.length === 0) {
+      return { presentUnits: 0, absentUnits: 0, totalUnits: 0 };
+    }
+
+    return attendanceRecords.reduce(
+      (acc, record) => {
+        const session = (record?.session || '').toUpperCase();
+        const weight = session === 'FN' || session === 'AN' ? 0.5 : 1;
+        const status = (record?.status || '').toUpperCase();
+
+        acc.totalUnits += weight;
+        if (status === 'PRESENT') {
+          acc.presentUnits += weight;
+        } else if (status === 'ABSENT') {
+          acc.absentUnits += weight;
+        }
+
+        return acc;
+      },
+      { presentUnits: 0, absentUnits: 0, totalUnits: 0 }
+    );
+  };
+
+  const getGroupedAttendanceByDate = (attendanceRecords = []) => {
+    const grouped = new Map();
+
+    (attendanceRecords || []).forEach((record) => {
+      const dateKey =
+        typeof record.attendanceDate === 'string'
+          ? record.attendanceDate
+          : new Date(record.attendanceDate).toISOString().split('T')[0];
+
+      if (!grouped.has(dateKey)) {
+        grouped.set(dateKey, { date: dateKey, fn: null, an: null, remarks: [] });
+      }
+
+      const row = grouped.get(dateKey);
+      if ((record.session || '').toUpperCase() === 'FN') {
+        row.fn = record;
+      } else if ((record.session || '').toUpperCase() === 'AN') {
+        row.an = record;
+      }
+
+      if (record.remarks) {
+        row.remarks.push(record.remarks);
+      }
+    });
+
+    return Array.from(grouped.values()).sort((a, b) => new Date(b.date) - new Date(a.date));
+  };
+
   const fetchData = async () => {
     setLoading(true);
     setError('');
@@ -68,8 +146,12 @@ const StudentDashboard = () => {
             endDate.toISOString().split('T')[0]
           ),
         ]);
-        setAttendance(attendanceRes.data || []);
-        setAttendancePercentage(percentageRes.data?.attendancePercentage ?? 0);
+        const attendanceData = attendanceRes.data || [];
+        setAttendance(attendanceData);
+
+        const calculatedPercentage = calculateHalfDayAttendancePercentage(attendanceData);
+        const fallbackApiPercentage = percentageRes.data?.attendancePercentage ?? 0;
+        setAttendancePercentage(attendanceData.length > 0 ? calculatedPercentage : fallbackApiPercentage);
       } else if (activeTab === 'results') {
         const [semesterMarksResult, allMarksResult, cgpaResult] = await Promise.allSettled([
           marksAPI.getSemesterMarks(user.userId, semester),
@@ -262,6 +344,68 @@ const StudentDashboard = () => {
     };
   };
 
+  const normalizeDepartment = (department) => (department || '').trim().toLowerCase();
+
+  const normalizeCourseStatus = (status) =>
+    (status || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[\s-]+/g, '_');
+
+  const isCourseAllowedForStudent = (course) => {
+    const studentDepartment = normalizeDepartment(user?.department);
+    const courseDepartment = normalizeDepartment(course?.department);
+    const courseStatus = normalizeCourseStatus(course?.courseStatus);
+
+    if (!studentDepartment || !courseDepartment) {
+      return true;
+    }
+
+    if (courseStatus === 'OPEN_ELECTIVE') {
+      return studentDepartment !== courseDepartment;
+    }
+
+    if (courseStatus === 'CORE' || courseStatus === 'CORE_ELECTIVE' || courseStatus === 'ELECTIVE') {
+      return studentDepartment === courseDepartment;
+    }
+
+    return true;
+  };
+
+  const canSelectByCurrentLimits = (course) => {
+    if (!selectionStatus) {
+      return true;
+    }
+
+    const status = normalizeCourseStatus(course?.courseStatus);
+
+    if (status === 'CORE') {
+      return (selectionStatus.coreCoursesSelected || 0) < (selectionStatus.maxCoreAllowed || 0);
+    }
+
+    if (status === 'CORE_ELECTIVE' || status === 'ELECTIVE') {
+      return (selectionStatus.coreElectiveCoursesSelected || 0) < (selectionStatus.maxCoreElectiveAllowed || 0);
+    }
+
+    if (status === 'OPEN_ELECTIVE') {
+      return (selectionStatus.openElectiveCoursesSelected || 0) < (selectionStatus.maxOpenElectiveAllowed || 0);
+    }
+
+    return true;
+  };
+
+  const isCourseSelected = (courseId) => selectedCourses.some((c) => c.courseId === courseId);
+
+  const availableCourses = courses.filter(
+    (course) =>
+      isCourseAllowedForStudent(course) &&
+      !isCourseSelected(course.courseId) &&
+      canSelectByCurrentLimits(course)
+  );
+
+  const attendanceSummary = getAttendanceUnitSummary(attendance);
+  const attendanceByDate = getGroupedAttendanceByDate(attendance);
+
   return (
     <div className="dashboard-container">
       <div className="dashboard-header">
@@ -316,31 +460,43 @@ const StudentDashboard = () => {
               <div className="stat-card">
                 <h3>Total Days Attended</h3>
                 <p className="stat-value">
-                  {attendance.filter((a) => a.status === 'PRESENT').length}
+                  {attendanceSummary.presentUnits}
                 </p>
               </div>
               <div className="stat-card">
                 <h3>Absent Days</h3>
                 <p className="stat-value">
-                  {attendance.filter((a) => a.status === 'ABSENT').length}
+                  {attendanceSummary.absentUnits}
                 </p>
               </div>
             </div>
 
-            <div className="charts-grid">
-              <div className="chart-container">
+            <div className="charts-grid attendance-charts-grid">
+              <div className="chart-container attendance-chart-small">
                 <h3>Attendance Trend</h3>
                 {attendance.length > 0 ? (
-                  <Line data={getAttendanceChartData()} options={{ responsive: true }} />
+                  <Line
+                    data={getAttendanceChartData()}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                    }}
+                  />
                 ) : (
                   <p className="no-data">No attendance data available</p>
                 )}
               </div>
 
-              <div className="chart-container">
+              <div className="chart-container attendance-chart-small">
                 <h3>Attendance Status</h3>
                 {attendance.length > 0 ? (
-                  <Doughnut data={getAttendanceStatusData()} options={{ responsive: true }} />
+                  <Doughnut
+                    data={getAttendanceStatusData()}
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                    }}
+                  />
                 ) : (
                   <p className="no-data">No attendance data available</p>
                 )}
@@ -355,26 +511,34 @@ const StudentDashboard = () => {
                     <thead>
                       <tr>
                         <th>Date</th>
-                        <th>Session</th>
-                        <th>Status</th>
+                        <th>FN</th>
+                        <th>AN</th>
                         <th>Remarks</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {attendance.map((item) => (
-                        <tr key={item.id}>
-                          <td>{new Date(item.attendanceDate).toLocaleDateString()}</td>
+                      {attendanceByDate.map((item) => (
+                        <tr key={item.date}>
+                          <td>{new Date(item.date).toLocaleDateString()}</td>
                           <td>
-                            <span className="session-badge">
-                              {item.session || '-'}
-                            </span>
+                            {item.fn ? (
+                              <span className={`status-badge ${item.fn.status.toLowerCase()}`}>
+                                {item.fn.status}
+                              </span>
+                            ) : (
+                              '-'
+                            )}
                           </td>
                           <td>
-                            <span className={`status-badge ${item.status.toLowerCase()}`}>
-                              {item.status}
-                            </span>
+                            {item.an ? (
+                              <span className={`status-badge ${item.an.status.toLowerCase()}`}>
+                                {item.an.status}
+                              </span>
+                            ) : (
+                              '-'
+                            )}
                           </td>
-                          <td>{item.remarks || '-'}</td>
+                          <td>{item.remarks.length > 0 ? [...new Set(item.remarks)].join(', ') : '-'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -544,7 +708,7 @@ const StudentDashboard = () => {
 
             <div className="available-courses">
               <h3>Available Courses</h3>
-              {courses.length > 0 ? (
+              {availableCourses.length > 0 ? (
                 <>
                 <div className="history-table" style={{ marginBottom: '10px' }}>
                   <table>
@@ -560,12 +724,10 @@ const StudentDashboard = () => {
                   </table>
                 </div>
                 <div className="courses-grid">
-                  {courses.map((course) => (
+                  {availableCourses.map((course) => (
                     <div
                       key={course.courseId}
-                      className={`course-card ${
-                        selectedCourses.some((c) => c.courseId === course.courseId) ? 'selected' : ''
-                      }`}
+                      className="course-card"
                     >
                       <div className="course-header">
                         <h4>{course.courseName}</h4>
@@ -575,15 +737,11 @@ const StudentDashboard = () => {
                       </div>
                       <p className="course-code">{course.courseCode}</p>
                       <p className="course-faculty">Department: {course.department}</p>
-                      <p className="course-faculty">Faculty User ID: {course.facultyUserId}</p>
                       <button
                         className="btn-select-course"
                         onClick={() => handleCourseSelect(course.courseId)}
-                        disabled={selectedCourses.some((c) => c.courseId === course.courseId)}
                       >
-                        {selectedCourses.some((c) => c.courseId === course.courseId)
-                          ? 'Selected'
-                          : 'Select'}
+                        Select
                       </button>
                     </div>
                   ))}

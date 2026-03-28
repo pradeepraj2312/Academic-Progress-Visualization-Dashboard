@@ -13,6 +13,7 @@ import java.util.Optional;
 public interface StudentMarksRepository extends JpaRepository<StudentMarks, Long> {
     Optional<StudentMarks> findByUserIdAndSemester(String userId, Integer semester);
     List<StudentMarks> findByUserId(String userId);
+    long deleteByUserId(String userId);
     List<StudentMarks> findByUserIdAndSemesterOrderByUpdatedAtDesc(String userId, Integer semester);
     Optional<StudentMarks> findByUserEmail(String userEmail);
     List<StudentMarks> findBySemester(Integer semester);

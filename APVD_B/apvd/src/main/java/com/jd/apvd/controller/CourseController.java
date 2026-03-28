@@ -1,6 +1,7 @@
 package com.jd.apvd.controller;
 
 import com.jd.apvd.dto.CourseDTO;
+import com.jd.apvd.dto.BulkUploadResultDTO;
 import com.jd.apvd.service.CourseService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -8,8 +9,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/courses")
@@ -26,6 +29,25 @@ public class CourseController {
     public ResponseEntity<CourseDTO> addCourse(@Valid @RequestBody CourseDTO courseDTO) {
         CourseDTO createdCourse = courseService.addCourse(courseDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdCourse);
+    }
+
+    /**
+     * Admin uploads courses from Excel
+     */
+    @PostMapping("/upload")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<BulkUploadResultDTO> uploadCourses(@RequestParam("file") MultipartFile file) {
+        BulkUploadResultDTO result = courseService.bulkUploadCourses(file);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Get all courses
+     */
+    @GetMapping
+    public ResponseEntity<List<CourseDTO>> getAllCourses() {
+        List<CourseDTO> courses = courseService.getAllCourses();
+        return ResponseEntity.ok(courses);
     }
     
     /**
@@ -100,6 +122,23 @@ public class CourseController {
             @PathVariable String facultyUserId) {
         List<CourseDTO> courses = courseService.getCoursesByFaculty(facultyUserId);
         return ResponseEntity.ok(courses);
+    }
+
+    /**
+     * Reassign all courses from one faculty to another (Admin only)
+     */
+    @PutMapping("/reassign-faculty")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Map<String, Object>> reassignFacultyCourses(
+            @RequestParam String fromFacultyUserId,
+            @RequestParam String toFacultyUserId) {
+        int reassignedCount = courseService.reassignCoursesToFaculty(fromFacultyUserId, toFacultyUserId);
+        return ResponseEntity.ok(Map.of(
+                "message", "Courses reassigned successfully",
+                "reassignedCount", reassignedCount,
+                "fromFacultyUserId", fromFacultyUserId,
+                "toFacultyUserId", toFacultyUserId
+        ));
     }
     
     /**

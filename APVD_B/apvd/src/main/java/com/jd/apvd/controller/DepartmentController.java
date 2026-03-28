@@ -1,6 +1,7 @@
 package com.jd.apvd.controller;
 
 import com.jd.apvd.dto.DepartmentDTO;
+import com.jd.apvd.dto.BulkUploadResultDTO;
 import com.jd.apvd.service.DepartmentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -8,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -26,6 +28,16 @@ public class DepartmentController {
     public ResponseEntity<DepartmentDTO> addDepartment(@Valid @RequestBody DepartmentDTO departmentDTO) {
         DepartmentDTO createdDepartment = departmentService.addDepartment(departmentDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdDepartment);
+    }
+
+    /**
+     * Admin uploads departments from Excel
+     */
+    @PostMapping("/upload")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<BulkUploadResultDTO> uploadDepartments(@RequestParam("file") MultipartFile file) {
+        BulkUploadResultDTO result = departmentService.bulkUploadDepartments(file);
+        return ResponseEntity.ok(result);
     }
     
     /**

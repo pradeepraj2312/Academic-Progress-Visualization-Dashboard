@@ -116,12 +116,15 @@ public class StudentAttendanceController {
         LocalDate end = LocalDate.parse(endDate);
         
         double percentage = attendanceService.getAttendancePercentage(userId, start, end);
-        long count = attendanceService.getAttendanceCount(userId, start, end);
+        double presentUnits = attendanceService.getPresentAttendanceUnits(userId, start, end);
+        double totalUnits = attendanceService.getTotalAttendanceUnits(userId, start, end);
         
         Map<String, Object> response = new HashMap<>();
         response.put("userId", userId);
         response.put("attendancePercentage", percentage);
-        response.put("presentDays", count);
+        response.put("presentDays", presentUnits);
+        response.put("presentUnits", presentUnits);
+        response.put("totalUnits", totalUnits);
         response.put("startDate", start);
         response.put("endDate", end);
         

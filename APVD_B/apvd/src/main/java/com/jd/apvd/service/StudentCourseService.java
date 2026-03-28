@@ -13,7 +13,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
@@ -140,12 +143,17 @@ public class StudentCourseService {
         // Verify student exists
         studentRepository.findByUserId(studentUserId)
                 .orElseThrow(() -> new RuntimeException("Student not found"));
-        
-        return studentCourseRepository.findByStudentUserIdAndSemester(studentUserId, semester)
+
+        List<StudentCourse> selections = studentCourseRepository.findByStudentUserIdAndSemester(studentUserId, semester);
+        Map<Long, Course> coursesById = loadCoursesByIds(selections);
+
+        return selections
                 .stream()
                 .map(sc -> {
-                    Course course = courseRepository.findById(sc.getCourseId())
-                            .orElseThrow(() -> new RuntimeException("Course not found"));
+                Course course = coursesById.get(sc.getCourseId());
+                if (course == null) {
+                throw new RuntimeException("Course not found");
+                }
                     return mapToDTO(sc, course);
                 })
                 .collect(Collectors.toList());
@@ -155,12 +163,17 @@ public class StudentCourseService {
      * Get all core courses selected by a student
      */
     public List<StudentCourseSelectionDTO> getStudentCoreCourses(String studentUserId, Integer semester) {
-        return studentCourseRepository.findByStudentUserIdAndSemesterAndCourseStatus(
-                studentUserId, semester, CourseStatus.CORE)
+        List<StudentCourse> selections = studentCourseRepository.findByStudentUserIdAndSemesterAndCourseStatus(
+            studentUserId, semester, CourseStatus.CORE);
+        Map<Long, Course> coursesById = loadCoursesByIds(selections);
+
+        return selections
                 .stream()
                 .map(sc -> {
-                    Course course = courseRepository.findById(sc.getCourseId())
-                            .orElseThrow(() -> new RuntimeException("Course not found"));
+                Course course = coursesById.get(sc.getCourseId());
+                if (course == null) {
+                throw new RuntimeException("Course not found");
+                }
                     return mapToDTO(sc, course);
                 })
                 .collect(Collectors.toList());
@@ -170,12 +183,19 @@ public class StudentCourseService {
      * Get all elective courses selected by a student
      */
     public List<StudentCourseSelectionDTO> getStudentElectiveCourses(String studentUserId, Integer semester) {
-        return studentCourseRepository.findByStudentUserIdAndSemesterAndCourseStatus(
-                studentUserId, semester, CourseStatus.ELECTIVE)
+        List<StudentCourse> selections = studentCourseRepository.findByStudentUserIdAndSemester(studentUserId, semester)
+            .stream()
+            .filter(sc -> sc.getCourseStatus() == CourseStatus.ELECTIVE || sc.getCourseStatus() == CourseStatus.CORE_ELECTIVE)
+            .collect(Collectors.toList());
+        Map<Long, Course> coursesById = loadCoursesByIds(selections);
+
+        return selections
                 .stream()
                 .map(sc -> {
-                    Course course = courseRepository.findById(sc.getCourseId())
-                            .orElseThrow(() -> new RuntimeException("Course not found"));
+                Course course = coursesById.get(sc.getCourseId());
+                if (course == null) {
+                throw new RuntimeException("Course not found");
+                }
                     return mapToDTO(sc, course);
                 })
                 .collect(Collectors.toList());
@@ -300,6 +320,16 @@ public class StudentCourseService {
         dto.setCourseStatus(course.getCourseStatus());
         dto.setDepartment(course.getDepartment());
         return dto;
+    }
+
+    private Map<Long, Course> loadCoursesByIds(List<StudentCourse> selections) {
+        Set<Long> courseIds = selections.stream()
+                .map(StudentCourse::getCourseId)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        return courseRepository.findAllById(courseIds)
+                .stream()
+                .collect(Collectors.toMap(Course::getCourseId, course -> course));
     }
     
     /**

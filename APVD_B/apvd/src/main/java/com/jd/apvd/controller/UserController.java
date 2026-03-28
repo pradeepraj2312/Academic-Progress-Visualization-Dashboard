@@ -2,6 +2,7 @@ package com.jd.apvd.controller;
 
 import com.jd.apvd.dto.UserRegisterDTO;
 import com.jd.apvd.dto.UserResponseDTO;
+import com.jd.apvd.dto.BulkUploadResultDTO;
 import com.jd.apvd.entity.UserRole;
 import com.jd.apvd.service.UserService;
 import jakarta.validation.Valid;
@@ -12,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -34,6 +36,17 @@ public class UserController {
         UserResponseDTO response = userService.adminAddStudent(registerDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
+
+    /**
+     * Admin bulk uploads students from Excel
+     */
+    @PostMapping("/admin/upload-students")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<BulkUploadResultDTO> adminUploadStudents(@RequestParam("file") MultipartFile file) {
+        log.info("Admin uploading students via Excel: {}", file.getOriginalFilename());
+        BulkUploadResultDTO response = userService.bulkUploadStudents(file);
+        return ResponseEntity.ok(response);
+    }
     
     /**
      * Admin adds a faculty
@@ -44,6 +57,17 @@ public class UserController {
         log.info("Admin adding new faculty with email: {}", registerDTO.getUserEmail());
         UserResponseDTO response = userService.adminAddFaculty(registerDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Admin bulk uploads faculties from Excel
+     */
+    @PostMapping("/admin/upload-faculties")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<BulkUploadResultDTO> adminUploadFaculties(@RequestParam("file") MultipartFile file) {
+        log.info("Admin uploading faculties via Excel: {}", file.getOriginalFilename());
+        BulkUploadResultDTO response = userService.bulkUploadFaculties(file);
+        return ResponseEntity.ok(response);
     }
     
     /**

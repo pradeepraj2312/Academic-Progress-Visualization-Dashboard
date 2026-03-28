@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../services/AuthContext';
 import { attendanceAPI, marksAPI, userAPI, departmentAPI, courseAPI } from '../services/api';
-import { FiUsers, FiBookOpen, FiBarChart2, FiSettings, FiPlus, FiTrash2, FiEdit2, FiEye, FiDownload, FiX, FiUser, FiBriefcase } from 'react-icons/fi';
+import { FiUsers, FiBookOpen, FiBarChart2, FiSettings, FiPlus, FiTrash2, FiEdit2, FiEye, FiDownload, FiX, FiUser, FiBriefcase, FiUpload } from 'react-icons/fi';
 import { MdCheckCircle, MdCancel } from 'react-icons/md';
 import '../styles/Dashboard.css';
 
@@ -57,6 +57,14 @@ const AdminDashboard = () => {
     departmentCode: '',
     description: '',
   });
+  const [studentAddMode, setStudentAddMode] = useState('manual');
+  const [facultyAddMode, setFacultyAddMode] = useState('manual');
+  const [courseAddMode, setCourseAddMode] = useState('manual');
+  const [departmentAddMode, setDepartmentAddMode] = useState('manual');
+  const [studentUploadFile, setStudentUploadFile] = useState(null);
+  const [facultyUploadFile, setFacultyUploadFile] = useState(null);
+  const [courseUploadFile, setCourseUploadFile] = useState(null);
+  const [departmentUploadFile, setDepartmentUploadFile] = useState(null);
   const [courses, setCourses] = useState([]);
   const [newCourse, setNewCourse] = useState({
     courseCode: '',
@@ -78,7 +86,15 @@ const AdminDashboard = () => {
   const [showMarkAttendance, setShowMarkAttendance] = useState(false);
   const [editingAttendanceId, setEditingAttendanceId] = useState(null);
   const [toast, setToast] = useState({ message: '', visible: false });
+  const [facultyReassignTargets, setFacultyReassignTargets] = useState({});
   const initialLoadUserRef = useRef('');
+
+  const getFacultyLabel = (facultyUserId) => {
+    if (!facultyUserId) return '-';
+    const faculty = faculties.find((item) => item.userId === facultyUserId);
+    if (!faculty) return '-';
+    return faculty.department ? `${faculty.username} (${faculty.department})` : faculty.username;
+  };
 
   const showToast = (message) => {
     setToast({ message, visible: true });
@@ -191,20 +207,67 @@ const AdminDashboard = () => {
   };
 
   const getFilteredAttendanceData = () => {
+    const grouped = new Map();
+
+    attendanceTableData.forEach((record) => {
+      const dateKey =
+        typeof record.attendanceDate === 'string'
+          ? record.attendanceDate
+          : new Date(record.attendanceDate).toISOString().split('T')[0];
+      const key = `${record.userId}__${dateKey}`;
+
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          key,
+          userId: record.userId,
+          username: record.username,
+          userEmail: record.userEmail,
+          enrollmentNumber: record.enrollmentNumber,
+          department: record.department,
+          yearOfStudying: record.yearOfStudying,
+          attendanceDate: dateKey,
+          fn: null,
+          an: null,
+          remarks: [],
+        });
+      }
+
+      const row = grouped.get(key);
+      if ((record.session || '').toUpperCase() === 'FN') {
+        row.fn = record;
+      } else if ((record.session || '').toUpperCase() === 'AN') {
+        row.an = record;
+      }
+
+      if (record.remarks) {
+        row.remarks.push(record.remarks);
+      }
+    });
+
+    const groupedList = Array.from(grouped.values()).sort(
+      (a, b) => new Date(b.attendanceDate) - new Date(a.attendanceDate)
+    );
+
     if (!attendanceSearchQuery.trim()) {
-      return attendanceTableData;
+      return groupedList;
     }
 
     const query = attendanceSearchQuery.toLowerCase();
-    return attendanceTableData.filter((record) =>
-      record.username.toLowerCase().includes(query) ||
-      record.userEmail.toLowerCase().includes(query) ||
-      record.userId.toLowerCase().includes(query) ||
-      (record.enrollmentNumber || '').toLowerCase().includes(query) ||
-      (record.department || '').toLowerCase().includes(query) ||
-      String(record.yearOfStudying || '').includes(query) ||
-      record.attendanceDate?.toString().includes(query)
-    );
+    return groupedList.filter((record) => {
+      const fnStatus = record.fn?.status?.toLowerCase() || '';
+      const anStatus = record.an?.status?.toLowerCase() || '';
+      return (
+        record.username.toLowerCase().includes(query) ||
+        record.userEmail.toLowerCase().includes(query) ||
+        record.userId.toLowerCase().includes(query) ||
+        (record.enrollmentNumber || '').toLowerCase().includes(query) ||
+        (record.department || '').toLowerCase().includes(query) ||
+        String(record.yearOfStudying || '').includes(query) ||
+        record.attendanceDate?.toString().includes(query) ||
+        fnStatus.includes(query) ||
+        anStatus.includes(query)
+      );
+    });
   };
 
   const getTodaysAttendanceStatus = (studentId) => {
@@ -245,7 +308,7 @@ const AdminDashboard = () => {
       });
 
       showToast(`Marked ${status.toLowerCase()} successfully!`);
-      fetchAttendanceData(students); // Refresh attendance table
+      fetchAttendanceData(students);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to mark attendance');
     } finally {
@@ -274,7 +337,7 @@ const AdminDashboard = () => {
 
       showToast(`Attendance updated to ${status}`);
       setEditingAttendanceId(null);
-      fetchAttendanceData(students); // Refresh attendance table
+      fetchAttendanceData(students);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update attendance');
     } finally {
@@ -328,12 +391,13 @@ const AdminDashboard = () => {
       showToast('Attendance marked successfully for ' + selectedStudentsForAttendance.size + ' students!');
       setSelectedStudentsForAttendance(new Set());
       setError('');
+      fetchAttendanceData(students);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to mark attendance');
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   const handleStudentSelect = async (student) => {
     setSelectedStudent(student);
@@ -341,7 +405,6 @@ const AdminDashboard = () => {
 
     try {
       const marksRes = await marksAPI.getStudentMarks(student.userId);
-
       setStudentMarks(marksRes.data || {});
     } catch {
       setError('Failed to fetch student data');
@@ -501,6 +564,97 @@ const AdminDashboard = () => {
     }
   };
 
+  const applyUploadResult = (entityLabel, result, clearFile) => {
+    const totalRows = result?.totalRows || 0;
+    const successCount = result?.successCount || 0;
+    const failedCount = result?.failedCount || 0;
+    const errors = result?.errors || [];
+
+    showToast(`${entityLabel} upload completed: ${successCount}/${totalRows} successful`);
+
+    if (failedCount > 0) {
+      setError(
+        `${entityLabel} upload has ${failedCount} failed row(s). ${errors.slice(0, 3).join(' | ')}`
+      );
+    } else {
+      setError('');
+    }
+
+    clearFile(null);
+  };
+
+  const handleUploadStudents = async () => {
+    if (!studentUploadFile) {
+      setError('Please choose a student Excel file first');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await userAPI.uploadStudents(studentUploadFile);
+      applyUploadResult('Student', response.data, setStudentUploadFile);
+      fetchStudents();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to upload students');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUploadFaculties = async () => {
+    if (!facultyUploadFile) {
+      setError('Please choose a faculty Excel file first');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await userAPI.uploadFaculties(facultyUploadFile);
+      applyUploadResult('Faculty', response.data, setFacultyUploadFile);
+      fetchFaculties();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to upload faculties');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUploadCourses = async () => {
+    if (!courseUploadFile) {
+      setError('Please choose a course Excel file first');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await courseAPI.uploadCourses(courseUploadFile);
+      applyUploadResult('Course', response.data, setCourseUploadFile);
+      fetchCourses();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to upload courses');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUploadDepartments = async () => {
+    if (!departmentUploadFile) {
+      setError('Please choose a department Excel file first');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await departmentAPI.uploadDepartments(departmentUploadFile);
+      applyUploadResult('Department', response.data, setDepartmentUploadFile);
+      fetchDepartments();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to upload departments');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleUpdateDepartment = async () => {
     try {
       if (!editingDepartment.departmentName) {
@@ -533,6 +687,92 @@ const AdminDashboard = () => {
       fetchDepartments();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to delete department');
+    }
+  };
+
+  const handleDeleteStudent = async (studentUserId) => {
+    if (!window.confirm('Are you sure you want to delete this student?')) {
+      return;
+    }
+
+    try {
+      await userAPI.deleteUser(studentUserId);
+      showToast('Student deleted successfully!');
+      if (selectedStudent?.userId === studentUserId) {
+        setSelectedStudent(null);
+      }
+      fetchStudents();
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+        (typeof err.response?.data === 'string' ? err.response.data : null) ||
+        'Failed to delete student'
+      );
+    }
+  };
+
+  const handleDeleteFaculty = async (facultyUserId) => {
+    if (!window.confirm('Are you sure you want to delete this faculty?')) {
+      return;
+    }
+
+    try {
+      await userAPI.deleteUser(facultyUserId);
+      showToast('Faculty deleted successfully!');
+      fetchFaculties();
+      fetchCourses();
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+        (typeof err.response?.data === 'string' ? err.response.data : null) ||
+        'Failed to delete faculty. Reassign courses before deleting.'
+      );
+    }
+  };
+
+  const handleDeleteCourse = async (courseId) => {
+    if (!window.confirm('Are you sure you want to delete this course?')) {
+      return;
+    }
+
+    try {
+      await courseAPI.deleteCourse(courseId);
+      showToast('Course deleted successfully!');
+      fetchCourses();
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+        (typeof err.response?.data === 'string' ? err.response.data : null) ||
+        'Failed to delete course'
+      );
+    }
+  };
+
+  const handleReassignFacultyCourses = async (fromFacultyUserId) => {
+    const toFacultyUserId = facultyReassignTargets[fromFacultyUserId];
+
+    if (!toFacultyUserId) {
+      setError('Please select target faculty for reallocation');
+      return;
+    }
+
+    if (toFacultyUserId === fromFacultyUserId) {
+      setError('Please select a different faculty for reallocation');
+      return;
+    }
+
+    try {
+      const response = await courseAPI.reassignFacultyCourses(fromFacultyUserId, toFacultyUserId);
+      const reassignedCount = response.data?.reassignedCount ?? 0;
+      showToast(`Reassigned ${reassignedCount} course(s) successfully!`);
+      setFacultyReassignTargets((prev) => ({ ...prev, [fromFacultyUserId]: '' }));
+      fetchCourses();
+    } catch (err) {
+      setError(
+        err.response?.data?.message ||
+        (typeof err.response?.data === 'string' ? err.response.data : null) ||
+        'Failed to reassign faculty courses'
+      );
     }
   };
 
@@ -660,40 +900,6 @@ const AdminDashboard = () => {
               
               {showMarkAttendance ? (
                 <>
-              <div className="filter-section">
-                <h4>Filter Students</h4>
-                <div className="filters-grid">
-                  <div className="filter-group">
-                    <label>Department:</label>
-                    <select
-                      value={attendanceFilters.department}
-                      onChange={(e) => setAttendanceFilters({ ...attendanceFilters, department: e.target.value })}
-                    >
-                      <option value="">All Departments</option>
-                      {departments.map((dept) => (
-                        <option key={dept.departmentId} value={dept.departmentName}>
-                          {dept.departmentName}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div className="filter-group">
-                    <label>Year:</label>
-                    <select
-                      value={attendanceFilters.year}
-                      onChange={(e) => setAttendanceFilters({ ...attendanceFilters, year: e.target.value })}
-                    >
-                      <option value="">All Years</option>
-                      <option value="1">Year 1</option>
-                      <option value="2">Year 2</option>
-                      <option value="3">Year 3</option>
-                      <option value="4">Year 4</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
               <div className="attendance-marking-section">
                 <h4>Session Details</h4>
                 <div className="marking-controls">
@@ -748,6 +954,36 @@ const AdminDashboard = () => {
                       onChange={(e) => setSearchQuery(e.target.value)}
                       className="search-input"
                     />
+                  </div>
+                  <div className="filters-grid list-filters-inline">
+                    <div className="filter-group">
+                      <label>Department:</label>
+                      <select
+                        value={attendanceFilters.department}
+                        onChange={(e) => setAttendanceFilters({ ...attendanceFilters, department: e.target.value })}
+                      >
+                        <option value="">All Departments</option>
+                        {departments.map((dept) => (
+                          <option key={dept.departmentId} value={dept.departmentName}>
+                            {dept.departmentName}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="filter-group">
+                      <label>Year:</label>
+                      <select
+                        value={attendanceFilters.year}
+                        onChange={(e) => setAttendanceFilters({ ...attendanceFilters, year: e.target.value })}
+                      >
+                        <option value="">All Years</option>
+                        <option value="1">Year 1</option>
+                        <option value="2">Year 2</option>
+                        <option value="3">Year 3</option>
+                        <option value="4">Year 4</option>
+                      </select>
+                    </div>
                   </div>
                   <button
                     className="btn btn-secondary btn-sm"
@@ -928,38 +1164,60 @@ const AdminDashboard = () => {
                         <th>Department</th>
                         <th>Year</th>
                         <th>Date</th>
-                        <th>Session</th>
-                        <th>Status</th>
+                        <th>FN</th>
+                        <th>AN</th>
                         <th>Remarks</th>
                       </tr>
                     </thead>
                     <tbody>
                       {getFilteredAttendanceData().map((record) => (
-                        <tr key={record.id}>
+                        <tr key={record.key}>
                           <td><strong>{record.username}</strong></td>
                           <td>{record.enrollmentNumber || '-'}</td>
                           <td>{record.userId}</td>
                           <td>{record.userEmail}</td>
                           <td>{record.department}</td>
                           <td>{record.yearOfStudying ?? '-'}</td>
-                          <td>{record.attendanceDate}</td>
-                          <td>{record.session}</td>
+                          <td>{new Date(record.attendanceDate).toLocaleDateString()}</td>
                           <td>
-                            <span className={`status-badge ${record.status.toLowerCase()}`}>
-                              {record.status === 'PRESENT' ? (
-                                <>
-                                  <MdCheckCircle style={{ marginRight: '4px' }} />
-                                  Present
-                                </>
-                              ) : (
-                                <>
-                                  <MdCancel style={{ marginRight: '4px' }} />
-                                  Absent
-                                </>
-                              )}
-                            </span>
+                            {record.fn ? (
+                              <span className={`status-badge ${record.fn.status.toLowerCase()}`}>
+                                {record.fn.status === 'PRESENT' ? (
+                                  <>
+                                    <MdCheckCircle style={{ marginRight: '4px' }} />
+                                    Present
+                                  </>
+                                ) : (
+                                  <>
+                                    <MdCancel style={{ marginRight: '4px' }} />
+                                    Absent
+                                  </>
+                                )}
+                              </span>
+                            ) : (
+                              '-'
+                            )}
                           </td>
-                          <td>{record.remarks || '-'}</td>
+                          <td>
+                            {record.an ? (
+                              <span className={`status-badge ${record.an.status.toLowerCase()}`}>
+                                {record.an.status === 'PRESENT' ? (
+                                  <>
+                                    <MdCheckCircle style={{ marginRight: '4px' }} />
+                                    Present
+                                  </>
+                                ) : (
+                                  <>
+                                    <MdCancel style={{ marginRight: '4px' }} />
+                                    Absent
+                                  </>
+                                )}
+                              </span>
+                            ) : (
+                              '-'
+                            )}
+                          </td>
+                          <td>{record.remarks.length > 0 ? [...new Set(record.remarks)].join(', ') : '-'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1126,6 +1384,24 @@ const AdminDashboard = () => {
               <h3>Course Management</h3>
               <p>Only admin can add courses. Courses are semester and department specific.</p>
 
+              <div className="entry-mode-toggle">
+                <button
+                  className={`mode-button ${courseAddMode === 'manual' ? 'active' : ''}`}
+                  type="button"
+                  onClick={() => setCourseAddMode('manual')}
+                >
+                  Manual Add
+                </button>
+                <button
+                  className={`mode-button ${courseAddMode === 'upload' ? 'active' : ''}`}
+                  type="button"
+                  onClick={() => setCourseAddMode('upload')}
+                >
+                  Upload Excel
+                </button>
+              </div>
+
+              {courseAddMode === 'manual' ? (
               <div className="add-student-form" style={{ marginTop: '12px' }}>
                 <div className="form-row">
                   <div className="form-group">
@@ -1184,13 +1460,18 @@ const AdminDashboard = () => {
                     </select>
                   </div>
                   <div className="form-group">
-                    <label>Faculty User ID *</label>
-                    <input
-                      type="text"
+                    <label>Faculty *</label>
+                    <select
                       value={newCourse.facultyUserId}
                       onChange={(e) => setNewCourse((prev) => ({ ...prev, facultyUserId: e.target.value }))}
-                      placeholder="Faculty user ID"
-                    />
+                    >
+                      <option value="">Select faculty</option>
+                      {faculties.map((faculty) => (
+                        <option key={faculty.userId} value={faculty.userId}>
+                          {faculty.department ? `${faculty.username} (${faculty.department})` : faculty.username}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
 
@@ -1231,6 +1512,24 @@ const AdminDashboard = () => {
                   </button>
                 </div>
               </div>
+              ) : (
+              <div className="add-student-form" style={{ marginTop: '12px' }}>
+                <h4 style={{ marginTop: 0 }}>Upload Courses from Excel</h4>
+                <p className="upload-helper-text">
+                  Column order: courseCode, courseName, department, semester, courseStatus, facultyUserId, description, credits, capacity
+                </p>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={(e) => setCourseUploadFile(e.target.files?.[0] || null)}
+                />
+                <div className="form-actions" style={{ marginTop: '12px' }}>
+                  <button type="button" className="btn-primary" onClick={handleUploadCourses} disabled={loading}>
+                    <FiUpload /> Upload Courses
+                  </button>
+                </div>
+              </div>
+              )}
 
               <div className="table-container" style={{ marginTop: '16px' }}>
                 {courses.length > 0 ? (
@@ -1243,6 +1542,7 @@ const AdminDashboard = () => {
                         <th>Semester</th>
                         <th>Type</th>
                         <th>Faculty</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1253,7 +1553,16 @@ const AdminDashboard = () => {
                           <td>{course.department}</td>
                           <td>{course.semester}</td>
                           <td>{course.courseStatus}</td>
-                          <td>{course.facultyUserId}</td>
+                          <td>{getFacultyLabel(course.facultyUserId)}</td>
+                          <td>
+                            <button
+                              className="btn-icon btn-delete"
+                              onClick={() => handleDeleteCourse(course.courseId)}
+                              title="Delete Course"
+                            >
+                              <FiTrash2 />
+                            </button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -1272,6 +1581,24 @@ const AdminDashboard = () => {
             <div className="add-student-form">
               <h3><FiUsers style={{ marginRight: '8px' }} /> Add New Student</h3>
 
+              <div className="entry-mode-toggle">
+                <button
+                  className={`mode-button ${studentAddMode === 'manual' ? 'active' : ''}`}
+                  type="button"
+                  onClick={() => setStudentAddMode('manual')}
+                >
+                  Manual Add
+                </button>
+                <button
+                  className={`mode-button ${studentAddMode === 'upload' ? 'active' : ''}`}
+                  type="button"
+                  onClick={() => setStudentAddMode('upload')}
+                >
+                  Upload Excel
+                </button>
+              </div>
+
+              {studentAddMode === 'manual' ? (
               <form>
                 <div className="form-row">
                   <div className="form-group">
@@ -1406,6 +1733,23 @@ const AdminDashboard = () => {
                   <FiPlus /> Add Student
                 </button>
               </form>
+              ) : (
+                <div>
+                  <p className="upload-helper-text">
+                    Column order: userId, username, userEmail, userPassword, mobile, enrollmentNumber, department, yearOfStudying
+                  </p>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={(e) => setStudentUploadFile(e.target.files?.[0] || null)}
+                  />
+                  <div className="form-actions" style={{ marginTop: '12px' }}>
+                    <button type="button" className="btn btn-primary" onClick={handleUploadStudents} disabled={loading}>
+                      <FiUpload /> Upload Students
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1416,6 +1760,24 @@ const AdminDashboard = () => {
             <div className="add-faculty-form">
               <h3>Add New Faculty</h3>
 
+              <div className="entry-mode-toggle">
+                <button
+                  className={`mode-button ${facultyAddMode === 'manual' ? 'active' : ''}`}
+                  type="button"
+                  onClick={() => setFacultyAddMode('manual')}
+                >
+                  Manual Add
+                </button>
+                <button
+                  className={`mode-button ${facultyAddMode === 'upload' ? 'active' : ''}`}
+                  type="button"
+                  onClick={() => setFacultyAddMode('upload')}
+                >
+                  Upload Excel
+                </button>
+              </div>
+
+              {facultyAddMode === 'manual' ? (
               <form>
                 <div className="form-row">
                   <div className="form-group">
@@ -1514,6 +1876,23 @@ const AdminDashboard = () => {
                   Add Faculty
                 </button>
               </form>
+              ) : (
+                <div>
+                  <p className="upload-helper-text">
+                    Column order: userId, username, userEmail, userPassword, mobile, department
+                  </p>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={(e) => setFacultyUploadFile(e.target.files?.[0] || null)}
+                  />
+                  <div className="form-actions" style={{ marginTop: '12px' }}>
+                    <button type="button" className="btn btn-primary" onClick={handleUploadFaculties} disabled={loading}>
+                      <FiUpload /> Upload Faculties
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1523,7 +1902,29 @@ const AdminDashboard = () => {
           <div className="tab-panel">
             <div className="departments-container">
               <div className="department-form-section">
-                <h3>{editingDepartment ? 'Edit Department' : 'Add New Department'}</h3>
+                <h3>{departmentAddMode === 'upload' ? 'Upload Departments' : (editingDepartment ? 'Edit Department' : 'Add New Department')}</h3>
+
+                <div className="entry-mode-toggle">
+                  <button
+                    className={`mode-button ${departmentAddMode === 'manual' ? 'active' : ''}`}
+                    type="button"
+                    onClick={() => setDepartmentAddMode('manual')}
+                  >
+                    Manual Add
+                  </button>
+                  <button
+                    className={`mode-button ${departmentAddMode === 'upload' ? 'active' : ''}`}
+                    type="button"
+                    onClick={() => {
+                      setDepartmentAddMode('upload');
+                      setEditingDepartment(null);
+                    }}
+                  >
+                    Upload Excel
+                  </button>
+                </div>
+
+                {departmentAddMode === 'manual' ? (
                 <form>
                   <div className="form-group">
                     <label htmlFor="dept-name">Department Name *</label>
@@ -1605,6 +2006,23 @@ const AdminDashboard = () => {
                     )}
                   </div>
                 </form>
+                ) : (
+                  <div>
+                    <p className="upload-helper-text">
+                      Column order: departmentName, departmentCode, description
+                    </p>
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls"
+                      onChange={(e) => setDepartmentUploadFile(e.target.files?.[0] || null)}
+                    />
+                    <div className="form-actions" style={{ marginTop: '12px' }}>
+                      <button type="button" className="btn btn-primary" onClick={handleUploadDepartments} disabled={loading}>
+                        <FiUpload /> Upload Departments
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="department-list-section">
@@ -1681,6 +2099,7 @@ const AdminDashboard = () => {
                         <th>Year</th>
                         <th>Mobile</th>
                         <th>User ID</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1706,6 +2125,15 @@ const AdminDashboard = () => {
                             <td>{student.yearOfStudying ?? '-'}</td>
                             <td>{student.mobile || '-'}</td>
                             <td>{student.userId}</td>
+                            <td>
+                              <button
+                                className="btn-icon btn-delete"
+                                onClick={() => handleDeleteStudent(student.userId)}
+                                title="Delete Student"
+                              >
+                                <FiTrash2 />
+                              </button>
+                            </td>
                           </tr>
                         ))}
                     </tbody>
@@ -1742,6 +2170,8 @@ const AdminDashboard = () => {
                         <th>Department</th>
                         <th>Mobile</th>
                         <th>User ID</th>
+                        <th>Reallocate Courses</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1764,6 +2194,44 @@ const AdminDashboard = () => {
                             <td>{faculty.department || '-'}</td>
                             <td>{faculty.mobile || '-'}</td>
                             <td>{faculty.userId}</td>
+                            <td>
+                              <div className="faculty-reassign-row">
+                                <select
+                                  value={facultyReassignTargets[faculty.userId] || ''}
+                                  onChange={(e) =>
+                                    setFacultyReassignTargets((prev) => ({
+                                      ...prev,
+                                      [faculty.userId]: e.target.value,
+                                    }))
+                                  }
+                                >
+                                  <option value="">Select Faculty</option>
+                                  {faculties
+                                    .filter((item) => item.userId !== faculty.userId)
+                                    .map((item) => (
+                                      <option key={item.userId} value={item.userId}>
+                                        {item.username} ({item.userId})
+                                      </option>
+                                    ))}
+                                </select>
+                                <button
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() => handleReassignFacultyCourses(faculty.userId)}
+                                  type="button"
+                                >
+                                  Reallocate
+                                </button>
+                              </div>
+                            </td>
+                            <td>
+                              <button
+                                className="btn-icon btn-delete"
+                                onClick={() => handleDeleteFaculty(faculty.userId)}
+                                title="Delete Faculty"
+                              >
+                                <FiTrash2 />
+                              </button>
+                            </td>
                           </tr>
                         ))}
                     </tbody>

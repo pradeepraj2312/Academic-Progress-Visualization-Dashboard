@@ -35,7 +35,7 @@ public class CourseDTO {
     private String description;
     
     private Integer credits;
-    
+
     private Integer capacity;
     
     private Integer enrolledCount;

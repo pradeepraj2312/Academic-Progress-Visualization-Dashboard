@@ -42,6 +42,20 @@ export const authAPI = {
 export const userAPI = {
   addStudent: (studentData) => api.post('/users/admin/add-student', studentData),
   addFaculty: (facultyData) => api.post('/users/admin/add-faculty', facultyData),
+  uploadStudents: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/users/admin/upload-students', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  uploadFaculties: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/users/admin/upload-faculties', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   facultyAddStudent: (studentData) => api.post('/users/faculty/add-student', studentData),
   getUsersByRole: (role) => api.get(`/users/role/${role}`),
   getUserById: (userId) => api.get(`/users/${userId}`),
@@ -80,9 +94,21 @@ export const attendanceAPI = {
 // Courses APIs (based on backend structure)
 export const courseAPI = {
   addCourse: (courseData) => api.post('/courses/add', courseData),
+  uploadCourses: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/courses/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   getAllCourses: () => api.get('/courses'),
   getCourseById: (courseId) => api.get(`/courses/${courseId}`),
+  deleteCourse: (courseId) => api.delete(`/courses/${courseId}`),
   getCoursesByDepartment: (department) => api.get(`/courses/department/${department}`),
+  reassignFacultyCourses: (fromFacultyUserId, toFacultyUserId) =>
+    api.put('/courses/reassign-faculty', null, {
+      params: { fromFacultyUserId, toFacultyUserId },
+    }),
   getCoursesByDepartmentAndSemester: (department, semester) =>
     api.get(`/courses/department/${department}/semester/${semester}`),
   getCoursesBySemester: (semester) => api.get(`/courses/semester/${semester}`),
@@ -106,6 +132,13 @@ export const gradesAPI = {
 // Department APIs
 export const departmentAPI = {
   addDepartment: (departmentData) => api.post('/departments/add', departmentData),
+  uploadDepartments: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/departments/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   getAllDepartments: () => api.get('/departments/all'),
   getDepartmentById: (departmentId) => api.get(`/departments/${departmentId}`),
   updateDepartment: (departmentId, departmentData) => api.put(`/departments/${departmentId}`, departmentData),

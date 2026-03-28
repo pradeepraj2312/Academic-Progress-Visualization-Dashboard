@@ -168,20 +168,67 @@ const FacultyDashboard = () => {
   };
 
   const getFilteredAttendanceData = () => {
+    const grouped = new Map();
+
+    attendanceTableData.forEach((record) => {
+      const dateKey =
+        typeof record.attendanceDate === 'string'
+          ? record.attendanceDate
+          : new Date(record.attendanceDate).toISOString().split('T')[0];
+      const key = `${record.userId}__${dateKey}`;
+
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          key,
+          userId: record.userId,
+          username: record.username,
+          userEmail: record.userEmail,
+          enrollmentNumber: record.enrollmentNumber,
+          department: record.department,
+          yearOfStudying: record.yearOfStudying,
+          attendanceDate: dateKey,
+          fn: null,
+          an: null,
+          remarks: [],
+        });
+      }
+
+      const row = grouped.get(key);
+      if ((record.session || '').toUpperCase() === 'FN') {
+        row.fn = record;
+      } else if ((record.session || '').toUpperCase() === 'AN') {
+        row.an = record;
+      }
+
+      if (record.remarks) {
+        row.remarks.push(record.remarks);
+      }
+    });
+
+    const groupedList = Array.from(grouped.values()).sort(
+      (a, b) => new Date(b.attendanceDate) - new Date(a.attendanceDate)
+    );
+
     if (!attendanceSearchQuery.trim()) {
-      return attendanceTableData;
+      return groupedList;
     }
 
     const query = attendanceSearchQuery.toLowerCase();
-    return attendanceTableData.filter((record) =>
-      record.username.toLowerCase().includes(query) ||
-      record.userEmail.toLowerCase().includes(query) ||
-      record.userId.toLowerCase().includes(query) ||
-      (record.enrollmentNumber || '').toLowerCase().includes(query) ||
-      (record.department || '').toLowerCase().includes(query) ||
-      String(record.yearOfStudying || '').includes(query) ||
-      record.attendanceDate?.toString().includes(query)
-    );
+    return groupedList.filter((record) => {
+      const fnStatus = record.fn?.status?.toLowerCase() || '';
+      const anStatus = record.an?.status?.toLowerCase() || '';
+      return (
+        record.username.toLowerCase().includes(query) ||
+        record.userEmail.toLowerCase().includes(query) ||
+        record.userId.toLowerCase().includes(query) ||
+        (record.enrollmentNumber || '').toLowerCase().includes(query) ||
+        (record.department || '').toLowerCase().includes(query) ||
+        String(record.yearOfStudying || '').includes(query) ||
+        record.attendanceDate?.toString().includes(query) ||
+        fnStatus.includes(query) ||
+        anStatus.includes(query)
+      );
+    });
   };
 
   const getTodaysAttendanceStatus = (studentId) => {
@@ -806,14 +853,14 @@ const FacultyDashboard = () => {
                               <th>Department</th>
                               <th>Year</th>
                               <th>Date</th>
-                              <th>Session</th>
-                              <th>Status</th>
+                              <th>FN</th>
+                              <th>AN</th>
                               <th>Remarks</th>
                             </tr>
                           </thead>
                           <tbody>
                             {getFilteredAttendanceData().map((record) => (
-                              <tr key={record.id}>
+                              <tr key={record.key}>
                                 <td><strong>{record.username}</strong></td>
                                 <td>{record.enrollmentNumber || '-'}</td>
                                 <td>{record.userId}</td>
@@ -822,16 +869,24 @@ const FacultyDashboard = () => {
                                 <td>{record.yearOfStudying ?? '-'}</td>
                                 <td>{new Date(record.attendanceDate).toLocaleDateString()}</td>
                                 <td>
-                                  <span className={`badge badge-${record.session.toLowerCase()}`}>
-                                    {record.session === 'FN' ? 'Forenoon' : 'Afternoon'}
-                                  </span>
+                                  {record.fn ? (
+                                    <span className={`badge badge-${record.fn.status.toLowerCase()}`}>
+                                      {record.fn.status}
+                                    </span>
+                                  ) : (
+                                    '-'
+                                  )}
                                 </td>
                                 <td>
-                                  <span className={`badge badge-${record.status.toLowerCase()}`}>
-                                    {record.status}
-                                  </span>
+                                  {record.an ? (
+                                    <span className={`badge badge-${record.an.status.toLowerCase()}`}>
+                                      {record.an.status}
+                                    </span>
+                                  ) : (
+                                    '-'
+                                  )}
                                 </td>
-                                <td>{record.remarks || '-'}</td>
+                                <td>{record.remarks.length > 0 ? [...new Set(record.remarks)].join(', ') : '-'}</td>
                               </tr>
                             ))}
                           </tbody>
