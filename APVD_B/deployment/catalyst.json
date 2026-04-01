@@ -1,0 +1,12 @@
+{
+  "appsail": [
+    {
+      "source": "appsail-nodejs",
+      "name": "APVD"
+    },
+    {
+      "source": ".",
+      "name": "apvd"
+    }
+  ]
+}

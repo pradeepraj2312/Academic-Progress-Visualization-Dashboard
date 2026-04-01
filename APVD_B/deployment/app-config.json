@@ -1,0 +1,9 @@
+{
+	"command": "java -jar apvd-0.0.1-SNAPSHOT.jar",
+	"build_path": ".",
+	"stack": "java17",
+	"env_variables": {},
+	"memory": 256,
+	"scripts": {},
+	"platform": "javase"
+}
