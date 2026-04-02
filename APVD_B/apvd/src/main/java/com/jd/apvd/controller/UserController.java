@@ -21,7 +21,7 @@ import java.util.List;
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(originPatterns = {"http://localhost:*", "https://*.development.catalystappsail.in"})
+@CrossOrigin(originPatterns = {"http://localhost:*", "https://academic-progress-visualization-das.vercel.app", "https://*.vercel.app", "https://*.development.catalystappsail.in"})
 public class UserController {
     
     private final UserService userService;

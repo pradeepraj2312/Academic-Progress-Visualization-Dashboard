@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: apvd
+    env: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true

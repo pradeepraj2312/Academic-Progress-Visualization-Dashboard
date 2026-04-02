@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(originPatterns = {"http://localhost:*", "https://*.development.catalystappsail.in"})
+@CrossOrigin(originPatterns = {"http://localhost:*", "https://academic-progress-visualization-das.vercel.app", "https://*.vercel.app", "https://*.development.catalystappsail.in"})
 public class AuthController {
     
     private final AuthService authService;

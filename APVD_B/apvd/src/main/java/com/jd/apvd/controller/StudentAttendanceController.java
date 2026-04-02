@@ -20,7 +20,7 @@ import java.util.Map;
 @RequestMapping("/api/attendance")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(originPatterns = {"http://localhost:*", "https://*.development.catalystappsail.in"})
+@CrossOrigin(originPatterns = {"http://localhost:*", "https://academic-progress-visualization-das.vercel.app", "https://*.vercel.app", "https://*.development.catalystappsail.in"})
 public class StudentAttendanceController {
     
     private final StudentAttendanceService attendanceService;
