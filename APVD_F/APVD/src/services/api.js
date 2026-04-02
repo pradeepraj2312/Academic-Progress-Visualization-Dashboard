@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-const DEFAULT_LOCAL_API_URL = 'http://localhost:3001/api';
-const DEFAULT_DEPLOYED_API_URL = 'https://apvd-50040577853.development.catalystappsail.in/api';
+const DEFAULT_LOCAL_API_URL = 'http://localhost:9000/api';
+const DEFAULT_DEPLOYED_API_URL = 'https://academic-progress-visualization-81yi.onrender.com/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
   window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
