@@ -32,21 +32,39 @@ public class StudentMarks {
     
     @Column(nullable = false)
     private Double subject1Mark;
+
+    @Column(nullable = false)
+    private String subject1Name;
     
     @Column(nullable = false)
     private Double subject2Mark;
+
+    @Column(nullable = false)
+    private String subject2Name;
     
     @Column(nullable = false)
     private Double subject3Mark;
+
+    @Column(nullable = false)
+    private String subject3Name;
     
     @Column(nullable = false)
     private Double subject4Mark;
+
+    @Column(nullable = false)
+    private String subject4Name;
     
     @Column(nullable = false)
     private Double subject5Mark;
+
+    @Column(nullable = false)
+    private String subject5Name;
     
     @Column(nullable = false)
     private Double subject6Mark;
+
+    @Column(nullable = false)
+    private String subject6Name;
     
     @Column(nullable = false)
     private Double totalMarks;  // Sum of all marks
@@ -64,13 +82,24 @@ public class StudentMarks {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        ensureDefaultSubjectNames();
         calculateTotalsAndSGPA();
     }
     
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
+        ensureDefaultSubjectNames();
         calculateTotalsAndSGPA();
+    }
+
+    private void ensureDefaultSubjectNames() {
+        if (subject1Name == null || subject1Name.isBlank()) subject1Name = "Subject 1";
+        if (subject2Name == null || subject2Name.isBlank()) subject2Name = "Subject 2";
+        if (subject3Name == null || subject3Name.isBlank()) subject3Name = "Subject 3";
+        if (subject4Name == null || subject4Name.isBlank()) subject4Name = "Subject 4";
+        if (subject5Name == null || subject5Name.isBlank()) subject5Name = "Subject 5";
+        if (subject6Name == null || subject6Name.isBlank()) subject6Name = "Subject 6";
     }
     
     private void calculateTotalsAndSGPA() {

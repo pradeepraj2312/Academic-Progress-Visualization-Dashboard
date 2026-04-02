@@ -22,15 +22,7 @@
           "idx": 1,
           "id": "60068567570",
           "name": "Development",
-          "type": 3,
-          "env_status": "Active",
-          "project_details": {
-            "project_name": "APVD",
-            "id": "37213000000012095",
-            "project_type": "Live"
-          },
-          "is_default": true,
-          "action_required": false
+          "type": 3
         }
       ]
     }

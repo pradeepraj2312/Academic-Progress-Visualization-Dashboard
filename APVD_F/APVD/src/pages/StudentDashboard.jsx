@@ -37,6 +37,7 @@ const StudentDashboard = () => {
   const [attendancePercentage, setAttendancePercentage] = useState(0);
   const [marks, setMarks] = useState([]);
   const [allSemesterMarks, setAllSemesterMarks] = useState([]);
+  const [resultsSubjects, setResultsSubjects] = useState([]);
   const [cgpa, setCGPA] = useState(0);
   const [courses, setCourses] = useState([]);
   const [selectedCourses, setSelectedCourses] = useState([]);
@@ -153,10 +154,11 @@ const StudentDashboard = () => {
         const fallbackApiPercentage = percentageRes.data?.attendancePercentage ?? 0;
         setAttendancePercentage(attendanceData.length > 0 ? calculatedPercentage : fallbackApiPercentage);
       } else if (activeTab === 'results') {
-        const [semesterMarksResult, allMarksResult, cgpaResult] = await Promise.allSettled([
+        const [semesterMarksResult, allMarksResult, cgpaResult, selectedCoursesResult] = await Promise.allSettled([
           marksAPI.getSemesterMarks(user.userId, semester),
           marksAPI.getStudentMarks(user.userId),
           marksAPI.calculateCGPA(user.userId),
+          courseAPI.getStudentCourses(user.userId, semester),
         ]);
 
         if (semesterMarksResult.status === 'fulfilled') {
@@ -180,6 +182,14 @@ const StudentDashboard = () => {
         } else {
           console.error('Error fetching CGPA:', cgpaResult.reason);
           setCGPA(0);
+        }
+
+        if (selectedCoursesResult.status === 'fulfilled') {
+          const selectedCoursesData = selectedCoursesResult.value.data || [];
+          setResultsSubjects(selectedCoursesData.slice(0, 6).map((course) => course.courseName));
+        } else {
+          console.error('Error fetching selected courses for results:', selectedCoursesResult.reason);
+          setResultsSubjects([]);
         }
       } else if (activeTab === 'courses') {
         const [selectedRes, allCoursesRes, statusRes] = await Promise.allSettled([
@@ -270,8 +280,23 @@ const StudentDashboard = () => {
     }
 
     const mark = marks[0];
+    const isGenericSubjectName = (name, subjectNumber) => {
+      if (!name || !String(name).trim()) return true;
+      const normalized = String(name).trim().toLowerCase();
+      return normalized === `s${subjectNumber}` || normalized === `subject ${subjectNumber}`;
+    };
+
+    const subjectLabels = [1, 2, 3, 4, 5, 6].map(
+      (subject) => {
+        if (resultsSubjects[subject - 1]) {
+          return resultsSubjects[subject - 1];
+        }
+        const savedName = mark[`subject${subject}Name`];
+        return isGenericSubjectName(savedName, subject) ? `Subject ${subject}` : savedName;
+      }
+    );
     return {
-      labels: ['Subject 1', 'Subject 2', 'Subject 3', 'Subject 4', 'Subject 5', 'Subject 6'],
+      labels: subjectLabels,
       datasets: [
         {
           label: `Semester ${semester} Marks`,
@@ -345,6 +370,23 @@ const StudentDashboard = () => {
   };
 
   const normalizeDepartment = (department) => (department || '').trim().toLowerCase();
+
+  const isGenericSubjectName = (name, subjectNumber) => {
+    if (!name || !String(name).trim()) return true;
+    const normalized = String(name).trim().toLowerCase();
+    return normalized === `s${subjectNumber}` || normalized === `subject ${subjectNumber}`;
+  };
+
+  const resolveResultSubjectName = (markData, subjectNumber) => {
+    if (resultsSubjects[subjectNumber - 1]) {
+      return resultsSubjects[subjectNumber - 1];
+    }
+    const savedName = markData?.[`subject${subjectNumber}Name`];
+    if (!isGenericSubjectName(savedName, subjectNumber)) {
+      return savedName;
+    }
+    return `Subject ${subjectNumber}`;
+  };
 
   const normalizeCourseStatus = (status) =>
     (status || '')
@@ -632,7 +674,7 @@ const StudentDashboard = () => {
                   {['subject1', 'subject2', 'subject3', 'subject4', 'subject5', 'subject6'].map(
                     (subject, index) => (
                       <div key={index} className="result-card">
-                        <h4>Subject {index + 1}</h4>
+                        <h4>{resolveResultSubjectName(marks[0], index + 1)}</h4>
                         <p className="mark-value">{marks[0][`${subject}Mark`] || 'N/A'}</p>
                         <p className="mark-label">Marks</p>
                       </div>

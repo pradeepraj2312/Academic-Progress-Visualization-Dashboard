@@ -34,31 +34,43 @@ public class StudentMarksDTO {
     @Min(0)
     @Max(100)
     private Double subject1Mark;
+
+    private String subject1Name;
     
     @NotNull(message = "Subject 2 Mark is required")
     @Min(0)
     @Max(100)
     private Double subject2Mark;
+
+    private String subject2Name;
     
     @NotNull(message = "Subject 3 Mark is required")
     @Min(0)
     @Max(100)
     private Double subject3Mark;
+
+    private String subject3Name;
     
     @NotNull(message = "Subject 4 Mark is required")
     @Min(0)
     @Max(100)
     private Double subject4Mark;
+
+    private String subject4Name;
     
     @NotNull(message = "Subject 5 Mark is required")
     @Min(0)
     @Max(100)
     private Double subject5Mark;
+
+    private String subject5Name;
     
     @NotNull(message = "Subject 6 Mark is required")
     @Min(0)
     @Max(100)
     private Double subject6Mark;
+
+    private String subject6Name;
     
     private Double totalMarks;
     private Double sgpa;

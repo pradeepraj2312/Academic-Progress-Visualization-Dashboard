@@ -1,9 +1,13 @@
 package com.jd.apvd.service;
 
 import com.jd.apvd.dto.StudentMarksDTO;
+import com.jd.apvd.entity.Course;
 import com.jd.apvd.entity.Student;
+import com.jd.apvd.entity.StudentCourse;
 import com.jd.apvd.entity.StudentMarks;
+import com.jd.apvd.repository.CourseRepository;
 import com.jd.apvd.repository.StudentMarksRepository;
+import com.jd.apvd.repository.StudentCourseRepository;
 import com.jd.apvd.repository.StudentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,9 +15,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.HashMap;
+import java.util.Comparator;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +30,8 @@ public class StudentMarksService {
     
     private final StudentMarksRepository studentMarksRepository;
     private final StudentRepository studentRepository;
+    private final StudentCourseRepository studentCourseRepository;
+    private final CourseRepository courseRepository;
     
     /**
      * Add or update student marks for a semester
@@ -48,6 +58,7 @@ public class StudentMarksService {
         marks.setSubject4Mark(marksDTO.getSubject4Mark());
         marks.setSubject5Mark(marksDTO.getSubject5Mark());
         marks.setSubject6Mark(marksDTO.getSubject6Mark());
+        applySelectedSubjectNames(marks, marksDTO.getUserId(), marksDTO.getSemester());
         
         StudentMarks savedMarks = studentMarksRepository.save(marks);
         
@@ -75,6 +86,12 @@ public class StudentMarksService {
                     dto.setSubject4Mark(0.0);
                     dto.setSubject5Mark(0.0);
                     dto.setSubject6Mark(0.0);
+                    dto.setSubject1Name("Subject 1");
+                    dto.setSubject2Name("Subject 2");
+                    dto.setSubject3Name("Subject 3");
+                    dto.setSubject4Name("Subject 4");
+                    dto.setSubject5Name("Subject 5");
+                    dto.setSubject6Name("Subject 6");
                     dto.setTotalMarks(0.0);
                     dto.setSgpa(0.0);
                     return dto;
@@ -197,10 +214,53 @@ public class StudentMarksService {
         dto.setSubject4Mark(marks.getSubject4Mark());
         dto.setSubject5Mark(marks.getSubject5Mark());
         dto.setSubject6Mark(marks.getSubject6Mark());
+        dto.setSubject1Name(marks.getSubject1Name());
+        dto.setSubject2Name(marks.getSubject2Name());
+        dto.setSubject3Name(marks.getSubject3Name());
+        dto.setSubject4Name(marks.getSubject4Name());
+        dto.setSubject5Name(marks.getSubject5Name());
+        dto.setSubject6Name(marks.getSubject6Name());
         dto.setTotalMarks(marks.getTotalMarks());
         dto.setSgpa(marks.getSgpa());
         dto.setCreatedAt(marks.getCreatedAt());
         dto.setUpdatedAt(marks.getUpdatedAt());
         return dto;
+    }
+
+    private void applySelectedSubjectNames(StudentMarks marks, String userId, Integer semester) {
+        List<StudentCourse> selectedCourses = studentCourseRepository.findByStudentUserIdAndSemester(userId, semester)
+                .stream()
+                .sorted(Comparator.comparing(StudentCourse::getCourseId))
+                .limit(6)
+                .collect(Collectors.toList());
+
+        Map<Long, Course> coursesById = new HashMap<>();
+        if (!selectedCourses.isEmpty()) {
+            coursesById = courseRepository.findAllById(
+                    selectedCourses.stream().map(StudentCourse::getCourseId).collect(Collectors.toList())
+            ).stream().collect(Collectors.toMap(Course::getCourseId, course -> course));
+        }
+
+        setSubjectName(marks::setSubject1Name, selectedCourses, coursesById, 0, "Subject 1");
+        setSubjectName(marks::setSubject2Name, selectedCourses, coursesById, 1, "Subject 2");
+        setSubjectName(marks::setSubject3Name, selectedCourses, coursesById, 2, "Subject 3");
+        setSubjectName(marks::setSubject4Name, selectedCourses, coursesById, 3, "Subject 4");
+        setSubjectName(marks::setSubject5Name, selectedCourses, coursesById, 4, "Subject 5");
+        setSubjectName(marks::setSubject6Name, selectedCourses, coursesById, 5, "Subject 6");
+    }
+
+    private void setSubjectName(Consumer<String> setter,
+                                List<StudentCourse> selectedCourses,
+                                Map<Long, Course> coursesById,
+                                int index,
+                                String fallback) {
+        if (selectedCourses.size() > index) {
+            Course course = coursesById.get(selectedCourses.get(index).getCourseId());
+            if (course != null && course.getCourseName() != null && !course.getCourseName().isBlank()) {
+                setter.accept(course.getCourseName());
+                return;
+            }
+        }
+        setter.accept(fallback);
     }
 }

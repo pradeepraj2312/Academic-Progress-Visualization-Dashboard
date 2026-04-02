@@ -1,6 +1,13 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'https://apvd-50040577853.development.catalystappsail.in/api';
+const DEFAULT_LOCAL_API_URL = 'http://localhost:3001/api';
+const DEFAULT_DEPLOYED_API_URL = 'https://apvd-50040577853.development.catalystappsail.in/api';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
+  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? DEFAULT_LOCAL_API_URL
+    : DEFAULT_DEPLOYED_API_URL
+);
 
 const api = axios.create({
   baseURL: API_BASE_URL,

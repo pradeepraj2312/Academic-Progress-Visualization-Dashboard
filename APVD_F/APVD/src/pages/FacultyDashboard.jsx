@@ -23,6 +23,7 @@ const FacultyDashboard = () => {
   const [students, setStudents] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [studentMarks, setStudentMarks] = useState({});
+  const [marksSubjects, setMarksSubjects] = useState([]);
   const [studentSelectedCourses, setStudentSelectedCourses] = useState([]);
   const [availableSemesterCourses, setAvailableSemesterCourses] = useState([]);
   const [courseSelectionStatus, setCourseSelectionStatus] = useState(null);
@@ -378,6 +379,26 @@ const FacultyDashboard = () => {
     }
   };
 
+  useEffect(() => {
+    const loadMarksSubjects = async () => {
+      if (activeTab !== 'results' || !selectedStudent?.userId || !markUpdate?.semester) {
+        setMarksSubjects([]);
+        return;
+      }
+
+      try {
+        const selectedRes = await courseAPI.getStudentCourses(selectedStudent.userId, markUpdate.semester);
+        const selected = selectedRes.data || [];
+        setMarksSubjects(selected.slice(0, 6).map((course) => course.courseName));
+      } catch (err) {
+        console.error('Failed to load selected subjects for marks:', err);
+        setMarksSubjects([]);
+      }
+    };
+
+    loadMarksSubjects();
+  }, [activeTab, selectedStudent, markUpdate.semester]);
+
   const loadStudentCourseManagementData = useCallback(async () => {
     if (!selectedStudent?.userId) return;
 
@@ -445,6 +466,12 @@ const FacultyDashboard = () => {
         subject4Mark: parseInt(markUpdate.subject4Mark) || 0,
         subject5Mark: parseInt(markUpdate.subject5Mark) || 0,
         subject6Mark: parseInt(markUpdate.subject6Mark) || 0,
+        subject1Name: marksSubjects[0] || 'Subject 1',
+        subject2Name: marksSubjects[1] || 'Subject 2',
+        subject3Name: marksSubjects[2] || 'Subject 3',
+        subject4Name: marksSubjects[3] || 'Subject 4',
+        subject5Name: marksSubjects[4] || 'Subject 5',
+        subject6Name: marksSubjects[5] || 'Subject 6',
       };
 
       await marksAPI.saveMarks(markData);
@@ -494,6 +521,23 @@ const FacultyDashboard = () => {
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to add student');
     }
+  };
+
+  const isGenericSubjectName = (name, subjectNumber) => {
+    if (!name || !String(name).trim()) return true;
+    const normalized = String(name).trim().toLowerCase();
+    return normalized === `s${subjectNumber}` || normalized === `subject ${subjectNumber}`;
+  };
+
+  const resolveSubjectName = (markData, subjectNumber) => {
+    if (marksSubjects[subjectNumber - 1]) {
+      return marksSubjects[subjectNumber - 1];
+    }
+    const savedName = markData?.[`subject${subjectNumber}Name`];
+    if (!isGenericSubjectName(savedName, subjectNumber)) {
+      return savedName;
+    }
+    return `Subject ${subjectNumber}`;
   };
 
 
@@ -979,9 +1023,9 @@ const FacultyDashboard = () => {
                       </div>
 
                       <div className="marks-grid">
-                        {[1, 2, 3, 4, 5, 6].map((subject) => (
+                        {[1, 2, 3, 4, 5, 6].map((subject, index) => (
                           <div key={subject} className="form-group">
-                            <label htmlFor={`subject${subject}`}>Subject {subject}</label>
+                            <label htmlFor={`subject${subject}`}>{marksSubjects[index] || `Subject ${subject}`}</label>
                             <input
                               type="number"
                               id={`subject${subject}`}
@@ -1016,7 +1060,7 @@ const FacultyDashboard = () => {
                                   <div className="marks-row">
                                     {[1, 2, 3, 4, 5, 6].map((subject) => (
                                       <div key={subject} className="mark-item">
-                                        <span>S{subject}</span>
+                                        <span>{resolveSubjectName(mark, subject)}</span>
                                         <p>{mark[`subject${subject}Mark`] || '-'}</p>
                                       </div>
                                     ))}
@@ -1030,7 +1074,7 @@ const FacultyDashboard = () => {
                                   <div className="marks-row">
                                     {[1, 2, 3, 4, 5, 6].map((subject) => (
                                       <div key={subject} className="mark-item">
-                                        <span>S{subject}</span>
+                                        <span>{resolveSubjectName(studentMarks, subject)}</span>
                                         <p>{studentMarks[`subject${subject}Mark`] || '-'}</p>
                                       </div>
                                     ))}

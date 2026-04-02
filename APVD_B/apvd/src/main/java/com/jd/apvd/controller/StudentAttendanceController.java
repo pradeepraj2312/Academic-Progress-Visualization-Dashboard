@@ -20,7 +20,7 @@ import java.util.Map;
 @RequestMapping("/api/attendance")
 @RequiredArgsConstructor
 @Slf4j
-@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:3000"})
+@CrossOrigin(originPatterns = {"http://localhost:*", "https://*.development.catalystappsail.in"})
 public class StudentAttendanceController {
     
     private final StudentAttendanceService attendanceService;
